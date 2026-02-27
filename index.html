@@ -17,36 +17,39 @@
         <div class="video-container" id="video-container">
             <div class="video-wrapper" id="video-wrapper"></div>
         </div>
-        
+
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <div class="loading-text">Loading videos...</div>
+            <div class="loading-text">Loading...</div>
         </div>
-        
-        <div class="hint" id="hint">↑ Swipe up</div>
-        
-        <div class="sidebar">
-            <div class="sidebar-item" id="sidebar-youtube">
-                <div class="sidebar-icon">▶️</div>
-                <div class="sidebar-text">YouTube</div>
-            </div>
-            <div class="sidebar-item" id="sidebar-shuffle">
-                <div class="sidebar-icon">🔀</div>
-                <div class="sidebar-text">Shuffle</div>
-            </div>
-            <div class="sidebar-item" id="sidebar-share">
-                <div class="sidebar-icon">↗️</div>
-                <div class="sidebar-text">Share</div>
-            </div>
+
+        <div class="top-bar">
+            <button class="filtri-btn" id="btn-filtri">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                    <line x1="10" y1="18" x2="14" y2="18"></line>
+                </svg>
+                FILTRI
+            </button>
         </div>
-        
-        <div class="bottom-bar">
-            <div class="channel-name" id="channel-name"></div>
-            <div class="track-name" id="track-name"></div>
-            <div class="track-details" id="track-details"></div>
+
+        <div class="bottom-overlay">
+            <span class="badge" id="badge">MIXED</span>
+            <div class="artist-name" id="artist-name"></div>
+            <div class="album-title" id="album-title"></div>
+            <div class="album-year" id="album-year"></div>
+            <div class="action-row">
+                <button class="btn-playlist" id="btn-playlist">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    PLAYLIST
+                </button>
+            </div>
         </div>
     </div>
-    
+
     <script src="app.js"></script>
 </body>
 </html>
