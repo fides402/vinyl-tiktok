@@ -1,7 +1,7 @@
 const YOUTUBE_API_KEY = 'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8';
 
-const CACHE_KEY = 'vinyl_tiktok_videos_v2';
-const CACHE_DURATION = 1000 * 60 * 60 * 24;
+const CACHE_KEY = 'vinyl_tiktok_videos_v3';
+const CACHE_DURATION = 1000 * 60 * 60 * 12;
 
 const CHANNEL_IDS = {
     'VinylArcheologie':              'UCKydEBEvAU5zkN8o1snt62A',
@@ -125,10 +125,19 @@ async function fetchAllVideos() {
         }
     }
     
-    for (let i = result.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [result[i], result[j]] = [result[j], result[i]];
+    // Fisher-Yates shuffle multiple times for better randomness
+    function fisherYatesShuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
+    
+    result.sort(() => Math.random() - 0.5);
+    result.sort(() => Math.random() - 0.5);
+    result.sort(() => Math.random() - 0.5);
+    fisherYatesShuffle(result);
     
     if (result.length > 0) {
         setCachedVideos(result);
@@ -156,7 +165,7 @@ function createVideoSlide(video, index) {
     slide.innerHTML = `
         <div class="thumbnail-bg" style="background-image:url(${video.thumbnail})"></div>
         <iframe 
-            data-src="https://www.youtube.com/embed/${video.id}?enablejsapi=1&iv_load_policy=3&playsinline=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&autoplay=1"
+            data-src="https://www.youtube.com/embed/${video.id}?enablejsapi=1&iv_load_policy=3&playsinline=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&autoplay=1"
             frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
