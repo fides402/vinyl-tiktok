@@ -2,10 +2,10 @@ const YOUTUBE_API_KEY = 'AIzaSyCzqWoDzcAO7eezfXPfguCwghlDh_ifZs8';
 const DISCOGS_TOKEN = 'fvYYQHvhAEHVshXGPHYtbAWSlTUNQpnNJcBBbYCB';
 
 const CHANNEL_SEARCH_TERMS = [
-    { name: 'VinylArcheologie', search: '@VinylArcheologie', id: 'UCKydEBEvAU5zkN8o1snt62A' },
-    { name: 'librariessountracksandrelated', search: '@librariessountracksandrelated', id: null },
-    { name: 'andrenavarroII', search: '@andrenavarroII', id: 'UCv5OAW45h67CJEY6kJLyisg' },
-    { name: 'oleg_samples', search: '@oleg_samples', id: null }
+    { name: 'VinylArcheologie', id: 'UCKydEBEvAU5zkN8o1snt62A' },
+    { name: 'librariessountracksandrelated', id: 'UCekevJPGTZ44nn_i4SWJDIw' },
+    { name: 'andrenavarroII', id: 'UCv5OAW45h67CJEY6kJLyisg' },
+    { name: 'oleg_samples', id: 'UC47qc6t2RelhfvI-OjgIY2A' }
 ];
 
 let channelIds = {};
@@ -169,13 +169,8 @@ async function loadVideos() {
     
     if (Object.keys(channelIds).length === 0) {
         for (const ch of CHANNEL_SEARCH_TERMS) {
-            let channelId = ch.id;
-            if (!channelId) {
-                channelId = await getChannelId(ch.search);
-            }
-            if (channelId) {
-                channelIds[ch.name] = channelId;
-                console.log(`Found channel ${ch.name}: ${channelId}`);
+            if (ch.id) {
+                channelIds[ch.name] = ch.id;
             }
         }
     }
