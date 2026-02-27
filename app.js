@@ -138,12 +138,23 @@ function playVideo(index) {
         
         if (i === index) {
             slide.style.display = 'flex';
+            
+            let src = iframe.src;
+            if (!src.includes('autoplay=1')) {
+                src = src.replace('youtube.com/embed/', 'youtube.com/embed?autoplay=1&');
+            }
+            src = src.replace('mute=0', 'mute=1');
+            iframe.src = src;
             iframe.style.display = 'block';
-            iframe.src = iframe.src.replace('mute=1', 'mute=0');
+            
+            setTimeout(() => {
+                iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+            }, 100);
+            
             thumb.classList.add('hidden');
         } else {
             iframe.style.display = 'none';
-            iframe.src = iframe.src.replace('mute=0', 'mute=1');
+            iframe.src = iframe.src.replace('autoplay=1', 'autoplay=0').replace('mute=0', 'mute=1');
             thumb.classList.remove('hidden');
             slide.style.display = 'none';
         }
@@ -183,11 +194,17 @@ function navigateTo(index, direction) {
             curSlide.style.transition = 'none';
             
             const iframe = curSlide.querySelector('iframe');
-            iframe.src = iframe.src.replace('mute=0', 'mute=1');
+            iframe.src = iframe.src.replace('autoplay=1', 'autoplay=0').replace('mute=0', 'mute=1');
             
             const nextIframe = nextSlide.querySelector('iframe');
             nextIframe.style.display = 'block';
-            nextIframe.src = nextIframe.src.replace('mute=1', 'mute=0');
+            let src = nextIframe.src;
+            src = src.replace('mute=1', 'mute=1');
+            if (!src.includes('autoplay=1')) {
+                src = src.replace('youtube.com/embed/', 'youtube.com/embed?autoplay=1&');
+            }
+            nextIframe.src = src;
+            
             nextSlide.querySelector('.thumbnail-bg').classList.add('hidden');
             
             updateUI(allVideos[index]);
@@ -237,7 +254,7 @@ function handleTouchEnd() {
     const diff = currentY - startY;
     const swipeTime = Date.now() - swipeStartTime;
     const velocity = Math.abs(diff) / swipeTime;
-    const isSwipe = Math.abs(diff) > 80 || velocity > 0.5;
+    const isSwipe = Math.abs(diff) > 50 || velocity > 0.3;
     
     const cleanup = (idx) => {
         const s = slideAt(idx);
@@ -247,9 +264,9 @@ function handleTouchEnd() {
         }
     };
     
-    if (isSwipe && diff < 0 && currentIndex < allVideos.length - 1) {
+    if (isSwipe && diff < -30 && currentIndex < allVideos.length - 1) {
         navigateTo(currentIndex + 1, 'up');
-    } else if (isSwipe && diff > 0 && currentIndex > 0) {
+    } else if (isSwipe && diff > 30 && currentIndex > 0) {
         navigateTo(currentIndex - 1, 'down');
     } else {
         const curSlide = slideAt(currentIndex);
@@ -330,5 +347,24 @@ videoContainer.addEventListener('touchstart', handleTouchStart, { passive: true 
 videoContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
 videoContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
 videoContainer.addEventListener('wheel', handleWheel, { passive: false });
+
+videoContainer.addEventListener('click', (e) => {
+    if (isNavigating) return;
+    const currentSlide = slideAt(currentIndex);
+    if (!currentSlide) return;
+    
+    const iframe = currentSlide.querySelector('iframe');
+    if (!iframe || !iframe.contentWindow) return;
+    
+    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+    
+    const playIcon = document.createElement('div');
+    playIcon.className = 'play-icon';
+    playIcon.innerHTML = '<i class="fa-solid fa-play"></i>';
+    playIcon.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:60px;color:white;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;';
+    document.body.appendChild(playIcon);
+    setTimeout(() => playIcon.style.opacity = '1', 10);
+    setTimeout(() => { playIcon.style.opacity = '0'; setTimeout(() => playIcon.remove(), 300); }, 500);
+});
 
 loadVideos();
