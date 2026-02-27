@@ -53,13 +53,21 @@ async function fetchChannelVideos(channelId, order) {
 async function fetchAllVideos() {
     const seen = new Set();
     const result = [];
-    const pageTokens = ['', 'CAoQAA', 'CBkQAA', 'CB0QAA', 'CCoQAA', 'CDkQAA'];
+    const pageTokens = ['', 'CAoQAA', 'CBkQAA'];
     
     for (const channelId of Object.values(CHANNEL_IDS)) {
         for (const pageToken of pageTokens) {
             const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
             try {
-                const data = await fetch(url).then(r => r.json());
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('YouTube API error:', data.error);
+                    loadingEl.querySelector('.loading-text').textContent = 'API Error - Please refresh';
+                    continue;
+                }
+                
                 if (!data.items || data.items.length === 0) break;
                 for (const item of data.items) {
                     if (!item.id.videoId) continue;
@@ -78,6 +86,7 @@ async function fetchAllVideos() {
             } catch (e) {
                 console.error('Fetch error:', e);
             }
+            await new Promise(r => setTimeout(r, 500));
         }
     }
     
