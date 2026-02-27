@@ -19,8 +19,8 @@ const loadingEl = document.getElementById('loading');
 const channelNameEl = document.getElementById('channel-name');
 const trackNameEl = document.getElementById('track-name');
 const trackDetailsEl = document.getElementById('track-details');
-const sidebarDiscogs = document.getElementById('sidebar-discogs');
 const sidebarYoutube = document.getElementById('sidebar-youtube');
+const sidebarShuffle = document.getElementById('sidebar-shuffle');
 const sidebarShare = document.getElementById('sidebar-share');
 
 let startY = 0;
@@ -67,10 +67,12 @@ async function searchDiscogs(trackTitle, artist) {
 
 function shuffleArray(array) {
     const shuffled = [...array];
+    
     for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+    
     return shuffled;
 }
 
@@ -107,17 +109,8 @@ function updateUI(video, index) {
         window.open(`https://youtube.com/watch?v=${video.id}`, '_blank');
     };
     
-    sidebarDiscogs.onclick = async () => {
-        const parts = video.title.split('-');
-        const artist = parts[0]?.trim() || video.channel;
-        const track = parts.slice(1).join('-')?.trim() || video.title;
-        
-        const discogsUrl = await searchDiscogs(track, artist);
-        if (discogsUrl) {
-            window.open(discogsUrl, '_blank');
-        } else {
-            window.open(`https://www.discogs.com/search/?q=${encodeURIComponent(artist + ' ' + track)}`, '_blank');
-        }
+    sidebarShuffle.onclick = () => {
+        shuffleAndRestart();
     };
     
     sidebarShare.onclick = () => {
@@ -132,6 +125,23 @@ function updateUI(video, index) {
             alert('Link copied!');
         }
     };
+}
+
+function shuffleAndRestart() {
+    allVideos = shuffleArray(allVideos);
+    
+    videoWrapper.innerHTML = '';
+    for (let i = 0; i < allVideos.length; i++) {
+        const slide = createVideoSlide(allVideos[i], i);
+        videoWrapper.appendChild(slide);
+        
+        slide.querySelector('.play-overlay').addEventListener('click', () => {
+            playVideo(i);
+        });
+    }
+    
+    const randomStart = Math.floor(Math.random() * allVideos.length);
+    playVideo(randomStart);
 }
 
 function playVideo(index) {
@@ -261,7 +271,8 @@ async function loadVideos() {
     loadingEl.classList.add('hidden');
     
     if (allVideos.length > 0) {
-        playVideo(0);
+        const randomStart = Math.floor(Math.random() * allVideos.length);
+        playVideo(randomStart);
     }
     
     isLoading = false;
