@@ -1,11 +1,8 @@
-const YOUTUBE_API_KEYS = [
-    'AIzaSyBw2r9SblJfPB80rsFpe34h3g7sFuz4_YI',
-    'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8',
-    'AIzaSyCzqWoDzcAO7eezfXPfguCwghlDh_ifZs8'
-];
+// INSERT YOUR NEW API KEY HERE
+const YOUTUBE_API_KEY = 'YOUR_API_KEY_HERE';
 
 function getApiKey() {
-    return YOUTUBE_API_KEYS[Math.floor(Math.random() * YOUTUBE_API_KEYS.length)];
+    return YOUTUBE_API_KEY;
 }
 
 const CACHE_KEY = 'vinyl_tiktok_all_videos';
@@ -49,7 +46,7 @@ function shuffleArray(arr) {
 }
 
 async function fetchChannelVideos(channelId, order) {
-    const url = `https://www.googleapis.com/youtube/v3/search?key=${getApiKey()}&channelId=${channelId}&part=snippet,id&order=${order}&maxResults=50&type=video`;
+    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=${order}&maxResults=50&type=video`;
     try {
         const data = await fetch(url).then(r => r.json());
         return (data.items || []).filter(i => i.id.videoId).map(i => ({
@@ -106,7 +103,7 @@ async function fetchAllVideos() {
                 if (result.length >= 200) break;
                 for (const pageToken of pageTokens) {
                     if (result.length >= 200) break;
-                    const url = `https://www.googleapis.com/youtube/v3/search?key=${getApiKey()}&channelId=${channelId}&part=snippet,id&order=date&maxResults=20&type=video${dateFilter}${pageToken ? '&pageToken=' + pageToken : ''}`;
+                    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=20&type=video${dateFilter}${pageToken ? '&pageToken=' + pageToken : ''}`;
                     try {
                     const response = await fetch(url);
                     const data = await response.json();
@@ -237,7 +234,7 @@ async function fetchMoreVideosFromAPI() {
     const randomChannel = Object.values(CHANNEL_IDS)[Math.floor(Math.random() * Object.values(CHANNEL_IDS).length)];
     
     for (const pageToken of pageTokens) {
-        const url = `https://www.googleapis.com/youtube/v3/search?key=${getApiKey()}&channelId=${randomChannel}&part=snippet,id&order=date&maxResults=15&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
+        const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${randomChannel}&part=snippet,id&order=date&maxResults=15&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
         try {
             const response = await fetch(url);
             const data = await response.json();
