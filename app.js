@@ -1,7 +1,8 @@
 const YOUTUBE_API_KEY = 'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8';
 
-const CACHE_KEY = 'vinyl_tiktok_videos_v3';
-const CACHE_DURATION = 1000 * 60 * 60 * 12;
+const CACHE_KEY = 'vinyl_tiktok_all_videos';
+const CACHE_DURATION = 1000 * 60 * 60 * 24 * 30;
+const SEEN_VIDEOS_KEY = 'vinyl_tiktok_seen';
 
 const CHANNEL_IDS = {
     'VinylArcheologie':              'UCKydEBEvAU5zkN8o1snt62A',
@@ -16,7 +17,7 @@ let isLoading = false;
 let isNavigating = false;
 let isPlaying = true;
 let isLoadingMore = false;
-let lastFetchedIndex = 0;
+let seenVideoIds = new Set();
 
 const videoContainer = document.getElementById('video-container');
 const videoWrapper = document.getElementById('video-wrapper');
@@ -59,12 +60,12 @@ async function fetchChannelVideos(channelId, order) {
 function getCachedVideos() {
     try {
         const cached = localStorage.getItem(CACHE_KEY);
+        const seenData = localStorage.getItem(SEEN_VIDEOS_KEY);
+        
         if (cached) {
             const data = JSON.parse(cached);
-            if (Date.now() - data.timestamp < CACHE_DURATION) {
-                console.log('Using cached videos:', data.videos.length);
-                return data.videos;
-            }
+            console.log('Using cached videos:', data.length);
+            return data;
         }
     } catch (e) {
         console.log('Cache read error:', e);
@@ -74,13 +75,18 @@ function getCachedVideos() {
 
 function setCachedVideos(videos) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({
-            timestamp: Date.now(),
-            videos: videos
-        }));
+        localStorage.setItem(CACHE_KEY, JSON.stringify(videos));
     } catch (e) {
         console.log('Cache write error:', e);
     }
+}
+
+function markVideoAsSeen(videoId) {
+    seenVideoIds.add(videoId);
+    try {
+        const arr = Array.from(seenVideoIds);
+        localStorage.setItem(SEEN_VIDEOS_KEY, JSON.stringify(arr));
+    } catch (e) {}
 }
 
 async function fetchAllVideos() {
@@ -137,9 +143,11 @@ async function fetchAllVideos() {
         return array;
     }
     
-    result.sort(() => Math.random() - 0.5);
-    result.sort(() => Math.random() - 0.5);
-    result.sort(() => Math.random() - 0.5);
+    // Shuffle many times for true randomness
+    for (let i = 0; i < 10; i++) {
+        result.sort(() => Math.random() - 0.5);
+    }
+    fisherYatesShuffle(result);
     fisherYatesShuffle(result);
     
     if (result.length > 0) {
@@ -197,16 +205,21 @@ async function loadMoreVideos() {
     if (isLoadingMore) return;
     isLoadingMore = true;
     
-    loadingEl.querySelector('.loading-text').textContent = 'Loading more...';
-    loadingEl.classList.remove('hidden');
+    setTimeout(() => {
+        if (!isLoadingMore) return;
+        loadingEl.querySelector('.loading-text').textContent = 'Loading more...';
+        loadingEl.classList.remove('hidden');
+    }, 500);
     
     const moreVideos = await fetchMoreVideosFromAPI();
     
-    moreVideos.forEach((video, i) => {
+    moreVideos.forEach((video) => {
         const slide = createVideoSlide(video, allVideos.length);
         videoWrapper.appendChild(slide);
         allVideos.push(video);
     });
+    
+    setCachedVideos(allVideos);
     
     loadingEl.classList.add('hidden');
     loadingEl.querySelector('.loading-text').textContent = 'Loading...';
