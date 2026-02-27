@@ -54,32 +54,50 @@ async function fetchAllVideos() {
     const seen = new Set();
     const result = [];
     
+    const dateRanges = [
+        '',
+        '&publishedBefore=2024-01-01T00:00:00Z',
+        '&publishedBefore=2023-01-01T00:00:00Z',
+        '&publishedBefore=2022-01-01T00:00:00Z',
+        '&publishedBefore=2021-01-01T00:00:00Z',
+        '&publishedBefore=2020-01-01T00:00:00Z'
+    ];
+    
     for (const channelId of Object.values(CHANNEL_IDS)) {
-        for (let pageToken of ['', 'CAEQAA', 'CAoQAA']) {
-            const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
-            try {
-                const data = await fetch(url).then(r => r.json());
-                for (const item of (data.items || [])) {
-                    if (!item.id.videoId) continue;
-                    if (!seen.has(item.id.videoId)) {
-                        seen.add(item.id.videoId);
-                        result.push({
-                            id: item.id.videoId,
-                            title: item.snippet.title,
-                            channel: item.snippet.channelTitle,
-                            thumbnail: `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
-                            published: item.snippet.publishedAt
-                        });
+        for (const dateRange of dateRanges) {
+            for (let page = 0; page < 3; page++) {
+                const pageToken = page === 0 ? '' : '&pageToken=' + ('CA' + 'A'.repeat(page + 2) + 'AA').slice(-(page + 3));
+                const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50&type=video${dateRange}${pageToken}`;
+                try {
+                    const data = await fetch(url).then(r => r.json());
+                    if (!data.items || data.items.length === 0) break;
+                    for (const item of data.items) {
+                        if (!item.id.videoId) continue;
+                        if (!seen.has(item.id.videoId)) {
+                            seen.add(item.id.videoId);
+                            result.push({
+                                id: item.id.videoId,
+                                title: item.snippet.title,
+                                channel: item.snippet.channelTitle,
+                                thumbnail: `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
+                                published: item.snippet.publishedAt
+                            });
+                        }
                     }
+                    if (!data.nextPageToken) break;
+                } catch (e) {
+                    console.error('Fetch error:', e);
                 }
-                if (!data.nextPageToken) break;
-            } catch (e) {
-                console.error('Fetch error:', e);
             }
         }
     }
     
-    return shuffleArray(result);
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    
+    return result;
 }
 
 function parseVideoTitle(rawTitle) {
