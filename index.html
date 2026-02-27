@@ -2,9 +2,12 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Vinyl TikTok</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
@@ -16,11 +19,13 @@
             <div class="spinner"></div>
         </div>
         
-        <div class="overlay" id="overlay">
-            <div class="disc-info" id="disc-info">
+        <div class="hint" id="hint">↑ Swipe up for next</div>
+        
+        <div class="overlay">
+            <div class="disc-info">
                 <a href="#" target="_blank" class="discogs-link" id="discogs-link">
                     <span class="vinyl-icon">💿</span>
-                    <span class="discogs-text">Find on Discogs</span>
+                    <span class="discogs-text">Discogs</span>
                 </a>
                 <a href="#" target="_blank" class="youtube-link" id="youtube-link">
                     <span class="yt-icon">▶</span>
@@ -28,8 +33,6 @@
                 </a>
             </div>
         </div>
-        
-        <div class="hint" id="hint">Swipe up for next</div>
     </div>
     
     <script src="app.js"></script>
