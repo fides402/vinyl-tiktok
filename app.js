@@ -15,6 +15,8 @@ let currentIndex = 0;
 let isLoading = false;
 let isNavigating = false;
 let isPlaying = true;
+let isLoadingMore = false;
+let lastFetchedIndex = 0;
 
 const videoContainer = document.getElementById('video-container');
 const videoWrapper = document.getElementById('video-wrapper');
@@ -191,8 +193,69 @@ function slideAt(index) {
     return videoWrapper.querySelector(`.video-slide[data-index="${index}"]`);
 }
 
+async function loadMoreVideos() {
+    if (isLoadingMore) return;
+    isLoadingMore = true;
+    
+    loadingEl.querySelector('.loading-text').textContent = 'Loading more...';
+    loadingEl.classList.remove('hidden');
+    
+    const moreVideos = await fetchMoreVideosFromAPI();
+    
+    moreVideos.forEach((video, i) => {
+        const slide = createVideoSlide(video, allVideos.length);
+        videoWrapper.appendChild(slide);
+        allVideos.push(video);
+    });
+    
+    loadingEl.classList.add('hidden');
+    loadingEl.querySelector('.loading-text').textContent = 'Loading...';
+    isLoadingMore = false;
+}
+
+async function fetchMoreVideosFromAPI() {
+    const seen = new Set(allVideos.map(v => v.id));
+    const result = [];
+    const pageTokens = ['', 'CAoQAA', 'CBkQAA'];
+    const randomChannel = Object.values(CHANNEL_IDS)[Math.floor(Math.random() * Object.values(CHANNEL_IDS).length)];
+    
+    for (const pageToken of pageTokens) {
+        const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${randomChannel}&part=snippet,id&order=date&maxResults=15&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.error || !data.items) break;
+            
+            for (const item of data.items) {
+                if (!item.id.videoId || seen.has(item.id.videoId)) continue;
+                seen.add(item.id.videoId);
+                result.push({
+                    id: item.id.videoId,
+                    title: item.snippet.title,
+                    channel: item.snippet.channelTitle,
+                    thumbnail: `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
+                    published: item.snippet.publishedAt
+                });
+            }
+            if (!data.nextPageToken) break;
+        } catch (e) {
+            console.error('Fetch error:', e);
+        }
+        await new Promise(r => setTimeout(r, 200));
+    }
+    
+    return result;
+}
+
 function playVideo(index) {
-    if (isNavigating || index < 0 || index >= allVideos.length) return;
+    if (index < 0) return;
+    
+    if (index >= allVideos.length - 5 && !isLoadingMore) {
+        loadMoreVideos();
+    }
+    
+    if (isNavigating || index >= allVideos.length) return;
     
     isNavigating = true;
     
