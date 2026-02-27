@@ -7,45 +7,22 @@ const CHANNEL_IDS = {
     'oleg_samples':                  'UC47qc6t2RelhfvI-OjgIY2A'
 };
 
-let allVideos   = [];
+let allVideos = [];
 let currentIndex = 0;
-let isLoading   = false;
-let players     = {};
-let ytApiReady  = false;
+let isLoading = false;
 let isNavigating = false;
 
 const videoContainer = document.getElementById('video-container');
-const videoWrapper   = document.getElementById('video-wrapper');
-const loadingEl      = document.getElementById('loading');
-const artistNameEl   = document.getElementById('artist-name');
-const albumTitleEl   = document.getElementById('album-title');
-const albumYearEl    = document.getElementById('album-year');
-const btnPlaylist    = document.getElementById('btn-playlist');
-const btnFiltri      = document.getElementById('btn-filtri');
+const videoWrapper = document.getElementById('video-wrapper');
+const loadingEl = document.getElementById('loading');
+const artistNameEl = document.getElementById('artist-name');
+const albumTitleEl = document.getElementById('album-title');
+const btnPlaylist = document.getElementById('btn-playlist');
 
-let startY      = 0;
-let currentY    = 0;
-let isSwiping   = false;
+let startY = 0;
+let currentY = 0;
+let isSwiping = false;
 let swipeStartTime = 0;
-let lastWheelTime  = 0;
-
-// ── YouTube IFrame API ──
-window.onYouTubeIframeAPIReady = () => { ytApiReady = true; };
-const ytScript = document.createElement('script');
-ytScript.src = 'https://www.youtube.com/iframe_api';
-document.head.appendChild(ytScript);
-
-// ── Utilities ──
-function parseVideoTitle(rawTitle) {
-    const yearMatch = rawTitle.match(/[\(\[]((?:19|20)\d{2})[\)\]]/);
-    const year  = yearMatch ? yearMatch[1] : '';
-    const clean = rawTitle.replace(/[\(\[]((?:19|20)\d{2})[\)\]]/, '').trim();
-    const dashIdx = clean.indexOf(' - ');
-    if (dashIdx > 0) {
-        return { artist: clean.substring(0, dashIdx).trim(), title: clean.substring(dashIdx + 3).trim(), year };
-    }
-    return { artist: '', title: clean, year };
-}
 
 function shuffleArray(arr) {
     const a = [...arr];
@@ -56,17 +33,15 @@ function shuffleArray(arr) {
     return a;
 }
 
-// ── Fetch — per ogni canale prendo sia i recenti che i più visti ──
 async function fetchChannelVideos(channelId, order) {
-    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}` +
-        `&channelId=${channelId}&part=snippet,id&order=${order}&maxResults=50&type=video`;
+    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=${order}&maxResults=50&type=video`;
     try {
         const data = await fetch(url).then(r => r.json());
         return (data.items || []).filter(i => i.id.videoId).map(i => ({
-            id:        i.id.videoId,
-            title:     i.snippet.title,
-            channel:   i.snippet.channelTitle,
-            thumbnail: `https://i.ytimg.com/vi/${i.id.videoId}/maxresdefault.jpg`,
+            id: i.id.videoId,
+            title: i.snippet.title,
+            channel: i.snippet.channelTitle,
+            thumbnail: `https://i.ytimg.com/vi/${i.id.videoId}/hqdefault.jpg`,
             published: i.snippet.publishedAt
         }));
     } catch (e) {
@@ -78,147 +53,157 @@ async function fetchChannelVideos(channelId, order) {
 async function fetchAllVideos() {
     const seen = new Set();
     const result = [];
-    const orders = ['date', 'viewCount'];
-
+    
     for (const channelId of Object.values(CHANNEL_IDS)) {
-        for (const order of orders) {
-            const videos = await fetchChannelVideos(channelId, order);
-            for (const v of videos) {
-                if (!seen.has(v.id)) { seen.add(v.id); result.push(v); }
+        for (let pageToken of ['', 'CAEQAA', 'CAoQAA']) {
+            const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
+            try {
+                const data = await fetch(url).then(r => r.json());
+                for (const item of (data.items || [])) {
+                    if (!item.id.videoId) continue;
+                    if (!seen.has(item.id.videoId)) {
+                        seen.add(item.id.videoId);
+                        result.push({
+                            id: item.id.videoId,
+                            title: item.snippet.title,
+                            channel: item.snippet.channelTitle,
+                            thumbnail: `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
+                            published: item.snippet.publishedAt
+                        });
+                    }
+                }
+                if (!data.nextPageToken) break;
+            } catch (e) {
+                console.error('Fetch error:', e);
             }
         }
     }
+    
     return shuffleArray(result);
 }
 
-// ── Slide DOM ──
+function parseVideoTitle(rawTitle) {
+    const yearMatch = rawTitle.match(/[\(\[]((?:19|20)\d{2})[\)\]]/);
+    const year = yearMatch ? yearMatch[1] : '';
+    const clean = rawTitle.replace(/[\(\[]((?:19|20)\d{2})[\)\]]/, '').trim();
+    const dashIdx = clean.indexOf(' - ');
+    if (dashIdx > 0) {
+        return { artist: clean.substring(0, dashIdx).trim(), title: clean.substring(dashIdx + 3).trim(), year };
+    }
+    return { artist: '', title: clean, year };
+}
+
 function createVideoSlide(video, index) {
     const slide = document.createElement('div');
     slide.className = 'video-slide';
     slide.dataset.index = index;
+    
     slide.innerHTML = `
         <div class="thumbnail-bg" style="background-image:url(${video.thumbnail})"></div>
-        <div class="iframe-container" id="yt-player-${index}"></div>
-        <div class="swipe-overlay"></div>
-        <div class="pp-indicator" id="pp-indicator-${index}"></div>
+        <iframe id="player-${index}" 
+            src="https://www.youtube.com/embed/${video.id}?enablejsapi=1&iv_load_policy=3&playsinline=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+            style="display:none;">
+        </iframe>
     `;
-    const overlay = slide.querySelector('.swipe-overlay');
-    overlay.addEventListener('touchstart', handleTouchStart, { passive: true });
-    overlay.addEventListener('touchmove',  handleTouchMove,  { passive: true });
-    overlay.addEventListener('touchend',   handleTouchEnd,   { passive: true });
+    
     return slide;
 }
 
-function slideAt(index) {
-    return videoWrapper.querySelectorAll('.video-slide')[index];
+function updateUI(video) {
+    const parsed = parseVideoTitle(video.title);
+    artistNameEl.textContent = parsed.artist || video.channel;
+    albumTitleEl.textContent = parsed.title || video.title;
+    
+    btnPlaylist.onclick = () => {
+        window.open(`https://youtube.com/watch?v=${video.id}`, '_blank');
+    };
 }
 
-// ── Player ──
-function createPlayer(index) {
-    if (players[index] || !ytApiReady) return;
-    players[index] = new YT.Player(`yt-player-${index}`, {
-        videoId: allVideos[index].id,
-        playerVars: {
-            autoplay: 0, controls: 0, disablekb: 1,
-            fs: 0, modestbranding: 1, rel: 0,
-            showinfo: 0, iv_load_policy: 3, playsinline: 1
-        },
-        events: {
-            onReady(e) { if (index === currentIndex) e.target.playVideo(); }
+function slideAt(index) {
+    return videoWrapper.querySelector(`.video-slide[data-index="${index}"]`);
+}
+
+function playVideo(index) {
+    if (isNavigating || index < 0 || index >= allVideos.length) return;
+    
+    isNavigating = true;
+    
+    const slides = videoWrapper.querySelectorAll('.video-slide');
+    slides.forEach((slide, i) => {
+        const iframe = slide.querySelector('iframe');
+        const thumb = slide.querySelector('.thumbnail-bg');
+        
+        if (i === index) {
+            slide.style.display = 'flex';
+            iframe.style.display = 'block';
+            iframe.src = iframe.src.replace('mute=1', 'mute=0');
+            thumb.classList.add('hidden');
+        } else {
+            iframe.style.display = 'none';
+            iframe.src = iframe.src.replace('mute=0', 'mute=1');
+            thumb.classList.remove('hidden');
+            slide.style.display = 'none';
         }
+    });
+    
+    updateUI(allVideos[index]);
+    currentIndex = index;
+    isNavigating = false;
+}
+
+function navigateTo(index, direction) {
+    if (isNavigating || index < 0 || index >= allVideos.length) return;
+    
+    isNavigating = true;
+    const curSlide = slideAt(currentIndex);
+    const nextSlide = slideAt(index);
+    
+    if (!curSlide || !nextSlide) {
+        isNavigating = false;
+        return;
+    }
+    
+    nextSlide.style.display = 'flex';
+    nextSlide.style.transform = direction === 'up' ? 'translateY(100%)' : 'translateY(-100%)';
+    
+    requestAnimationFrame(() => {
+        const duration = 300;
+        curSlide.style.transition = `transform ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        nextSlide.style.transition = `transform ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        
+        curSlide.style.transform = direction === 'up' ? 'translateY(-100%)' : 'translateY(100%)';
+        nextSlide.style.transform = 'translateY(0)';
+        
+        setTimeout(() => {
+            curSlide.style.display = 'none';
+            curSlide.style.transform = 'translateY(0)';
+            curSlide.style.transition = 'none';
+            
+            const iframe = curSlide.querySelector('iframe');
+            iframe.src = iframe.src.replace('mute=0', 'mute=1');
+            
+            const nextIframe = nextSlide.querySelector('iframe');
+            nextIframe.style.display = 'block';
+            nextIframe.src = nextIframe.src.replace('mute=1', 'mute=0');
+            nextSlide.querySelector('.thumbnail-bg').classList.add('hidden');
+            
+            updateUI(allVideos[index]);
+            currentIndex = index;
+            isNavigating = false;
+        }, duration);
     });
 }
 
-function updateUI(video) {
-    const p = parseVideoTitle(video.title);
-    artistNameEl.textContent = p.artist || video.channel;
-    albumTitleEl.textContent = p.title;
-    albumYearEl.textContent  = p.year || new Date(video.published).getFullYear();
-    btnPlaylist.onclick = () => window.open(`https://youtube.com/watch?v=${video.id}`, '_blank');
-}
-
-function togglePlayPause(index) {
-    const player = players[index];
-    if (!player) return;
-    const indicator = document.getElementById(`pp-indicator-${index}`);
-    try {
-        const state = player.getPlayerState();
-        if (state === YT.PlayerState.PLAYING) {
-            player.pauseVideo(); flash(indicator, '⏸');
-        } else {
-            player.playVideo();  flash(indicator, '▶');
-        }
-    } catch (e) {}
-}
-
-function flash(el, symbol) {
-    if (!el) return;
-    el.textContent = symbol;
-    el.classList.add('visible');
-    clearTimeout(el._t);
-    el._t = setTimeout(() => el.classList.remove('visible'), 700);
-}
-
-// ── TikTok-style navigation ──
-const ANIM_MS = 320;
-
-function navigateTo(nextIndex, direction) {
-    if (isNavigating) return;
-    if (nextIndex < 0 || nextIndex >= allVideos.length) return;
-
-    isNavigating = true;
-
-    const curSlide  = slideAt(currentIndex);
-    const nextSlide = slideAt(nextIndex);
-
-    // Ensure next slide is visible and positioned
-    nextSlide.style.transition = 'none';
-    nextSlide.style.transform  = direction === 'up' ? 'translateY(100%)' : 'translateY(-100%)';
-    nextSlide.style.display    = 'flex';
-
-    // Force reflow so the initial position is applied before animating
-    nextSlide.getBoundingClientRect();
-
-    const ease = `transform ${ANIM_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-    curSlide.style.transition  = ease;
-    nextSlide.style.transition = ease;
-
-    curSlide.style.transform  = direction === 'up' ? 'translateY(-100%)' : 'translateY(100%)';
-    nextSlide.style.transform = 'translateY(0)';
-
-    setTimeout(() => {
-        // Hide and reset old slide
-        curSlide.style.display    = 'none';
-        curSlide.style.transform  = 'translateY(0)';
-        curSlide.style.transition = 'none';
-
-        // Pause old player
-        if (players[currentIndex]) { try { players[currentIndex].pauseVideo(); } catch (e) {} }
-
-        currentIndex = nextIndex;
-
-        // Activate new player
-        nextSlide.querySelector('.thumbnail-bg').classList.add('hidden');
-        if (!players[currentIndex]) createPlayer(currentIndex);
-        else { try { players[currentIndex].playVideo(); } catch (e) {} }
-
-        updateUI(allVideos[currentIndex]);
-        isNavigating = false;
-    }, ANIM_MS);
-}
-
-function goToNext() { navigateTo(currentIndex + 1, 'up'); }
-function goToPrev() { navigateTo(currentIndex - 1, 'down'); }
-
-// ── Touch — vero effetto TikTok: si vede il prossimo che sale ──
 function handleTouchStart(e) {
     if (isNavigating) return;
     startY = e.touches[0].clientY;
     currentY = startY;
     isSwiping = true;
     swipeStartTime = Date.now();
-
-    // Pre-position adjacent slides
+    
     const nextSlide = slideAt(currentIndex + 1);
     const prevSlide = slideAt(currentIndex - 1);
     if (nextSlide) { nextSlide.style.transition = 'none'; nextSlide.style.transform = 'translateY(100%)'; nextSlide.style.display = 'flex'; }
@@ -227,13 +212,15 @@ function handleTouchStart(e) {
 
 function handleTouchMove(e) {
     if (!isSwiping || isNavigating) return;
+    e.preventDefault();
+    
     currentY = e.touches[0].clientY;
-    const diff = currentY - startY; // positive = drag down, negative = drag up
-
+    const diff = currentY - startY;
+    
     const curSlide = slideAt(currentIndex);
     curSlide.style.transition = 'none';
-    curSlide.style.transform  = `translateY(${diff}px)`;
-
+    curSlide.style.transform = `translateY(${diff}px)`;
+    
     if (diff < 0 && currentIndex < allVideos.length - 1) {
         const nextSlide = slideAt(currentIndex + 1);
         if (nextSlide) { nextSlide.style.transition = 'none'; nextSlide.style.transform = `translateY(calc(100% + ${diff}px))`; }
@@ -246,127 +233,102 @@ function handleTouchMove(e) {
 function handleTouchEnd() {
     if (!isSwiping) return;
     isSwiping = false;
-
-    const diff      = currentY - startY;
+    
+    const diff = currentY - startY;
     const swipeTime = Date.now() - swipeStartTime;
-    const velocity  = Math.abs(diff) / swipeTime;
-    const isSwipe   = Math.abs(diff) > 60 || velocity > 0.4;
-    const isTap     = Math.abs(diff) < 10 && swipeTime < 250;
-
-    // Reset adjacent slides that aren't going to be navigated to
-    const cleanup = (index) => {
-        const s = slideAt(index);
-        if (s) { s.style.display = 'none'; s.style.transform = 'translateY(0)'; s.style.transition = 'none'; }
+    const velocity = Math.abs(diff) / swipeTime;
+    const isSwipe = Math.abs(diff) > 80 || velocity > 0.5;
+    
+    const cleanup = (idx) => {
+        const s = slideAt(idx);
+        if (s && idx !== currentIndex && idx !== currentIndex + 1 && idx !== currentIndex - 1) {
+            s.style.display = 'none';
+            s.style.transform = 'translateY(0)';
+        }
     };
-
+    
     if (isSwipe && diff < 0 && currentIndex < allVideos.length - 1) {
-        // Complete the up-swipe (go next) — slides already moving, just finish
-        const ease = `transform ${ANIM_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-        const curSlide  = slideAt(currentIndex);
-        const nextSlide = slideAt(currentIndex + 1);
-        curSlide.style.transition  = ease;
-        nextSlide.style.transition = ease;
-        curSlide.style.transform   = 'translateY(-100%)';
-        nextSlide.style.transform  = 'translateY(0)';
-        cleanup(currentIndex - 1);
-
-        setTimeout(() => {
-            curSlide.style.display    = 'none';
-            curSlide.style.transform  = 'translateY(0)';
-            curSlide.style.transition = 'none';
-            if (players[currentIndex]) { try { players[currentIndex].pauseVideo(); } catch (e) {} }
-            currentIndex = currentIndex + 1;
-            nextSlide.querySelector('.thumbnail-bg').classList.add('hidden');
-            if (!players[currentIndex]) createPlayer(currentIndex);
-            else { try { players[currentIndex].playVideo(); } catch (e) {} }
-            updateUI(allVideos[currentIndex]);
-            isNavigating = false;
-        }, ANIM_MS);
+        navigateTo(currentIndex + 1, 'up');
     } else if (isSwipe && diff > 0 && currentIndex > 0) {
-        // Complete the down-swipe (go prev)
-        const ease = `transform ${ANIM_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-        const curSlide  = slideAt(currentIndex);
-        const prevSlide = slideAt(currentIndex - 1);
-        curSlide.style.transition  = ease;
-        prevSlide.style.transition = ease;
-        curSlide.style.transform   = 'translateY(100%)';
-        prevSlide.style.transform  = 'translateY(0)';
-        cleanup(currentIndex + 1);
-
-        setTimeout(() => {
-            curSlide.style.display    = 'none';
-            curSlide.style.transform  = 'translateY(0)';
-            curSlide.style.transition = 'none';
-            if (players[currentIndex]) { try { players[currentIndex].pauseVideo(); } catch (e) {} }
-            currentIndex = currentIndex - 1;
-            prevSlide.querySelector('.thumbnail-bg').classList.add('hidden');
-            if (!players[currentIndex]) createPlayer(currentIndex);
-            else { try { players[currentIndex].playVideo(); } catch (e) {} }
-            updateUI(allVideos[currentIndex]);
-            isNavigating = false;
-        }, ANIM_MS);
+        navigateTo(currentIndex - 1, 'down');
     } else {
-        // Snap back
-        const ease = `transform ${ANIM_MS / 2}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         const curSlide = slideAt(currentIndex);
-        curSlide.style.transition = ease;
-        curSlide.style.transform  = 'translateY(0)';
-        cleanup(currentIndex + 1);
-        cleanup(currentIndex - 1);
-
-        if (isTap) togglePlayPause(currentIndex);
+        if (curSlide) {
+            curSlide.style.transition = 'transform 0.2s ease';
+            curSlide.style.transform = 'translateY(0)';
+        }
+        
+        const nextSlide = slideAt(currentIndex + 1);
+        const prevSlide = slideAt(currentIndex - 1);
+        
+        if (nextSlide && currentIndex < allVideos.length - 1) {
+            nextSlide.style.transition = 'transform 0.2s ease';
+            nextSlide.style.transform = 'translateY(100%)';
+        }
+        if (prevSlide && currentIndex > 0) {
+            prevSlide.style.transition = 'transform 0.2s ease';
+            prevSlide.style.transform = 'translateY(-100%)';
+        }
+        
+        setTimeout(() => {
+            cleanup(currentIndex + 2);
+            cleanup(currentIndex - 2);
+        }, 200);
     }
 }
 
-// ── Wheel with 500ms cooldown ──
+let wheelTimeout;
 function handleWheel(e) {
     e.preventDefault();
-    const now = Date.now();
-    if (now - lastWheelTime < 500) return;
-    lastWheelTime = now;
-    if (e.deltaY > 0) goToNext(); else if (e.deltaY < 0) goToPrev();
+    
+    if (wheelTimeout) return;
+    
+    wheelTimeout = setTimeout(() => {
+        wheelTimeout = null;
+    }, 400);
+    
+    if (e.deltaY > 10) {
+        navigateTo(currentIndex + 1, 'up');
+    } else if (e.deltaY < -10) {
+        navigateTo(currentIndex - 1, 'down');
+    }
 }
 
-// ── Initial play ──
-function startAt(index) {
-    const slide = slideAt(index);
-    slide.style.display   = 'flex';
-    slide.style.transform = 'translateY(0)';
-    slide.querySelector('.thumbnail-bg').classList.add('hidden');
-    currentIndex = index;
-    createPlayer(index);
-    updateUI(allVideos[index]);
-}
-
-// ── Shuffle button ──
-function shuffleAndRestart() {
-    Object.values(players).forEach(p => { try { p.destroy(); } catch (e) {} });
-    players = {};
-    allVideos = shuffleArray(allVideos);
-    videoWrapper.innerHTML = '';
-    allVideos.forEach((v, i) => videoWrapper.appendChild(createVideoSlide(v, i)));
-    startAt(Math.floor(Math.random() * allVideos.length));
-}
-
-// ── Init ──
 async function loadVideos() {
     if (isLoading) return;
+    
     isLoading = true;
-
+    loadingEl.classList.remove('hidden');
+    
     allVideos = await fetchAllVideos();
-    allVideos.forEach((v, i) => videoWrapper.appendChild(createVideoSlide(v, i)));
-
+    
+    videoWrapper.innerHTML = '';
+    allVideos.forEach((video, i) => {
+        const slide = createVideoSlide(video, i);
+        videoWrapper.appendChild(slide);
+    });
+    
     loadingEl.classList.add('hidden');
-    if (allVideos.length > 0) startAt(Math.floor(Math.random() * allVideos.length));
+    
+    if (allVideos.length > 0) {
+        const randomStart = Math.floor(Math.random() * Math.min(10, allVideos.length));
+        playVideo(randomStart);
+    }
+    
     isLoading = false;
 }
 
-btnFiltri.addEventListener('click', shuffleAndRestart);
-videoContainer.addEventListener('wheel', handleWheel, { passive: false });
-document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown' || e.key === 'j')    goToNext();
-    else if (e.key === 'ArrowUp' || e.key === 'k') goToPrev();
-    else if (e.key === ' ') { e.preventDefault(); togglePlayPause(currentIndex); }
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'j') {
+        navigateTo(currentIndex + 1, 'up');
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        navigateTo(currentIndex - 1, 'down');
+    }
 });
+
+videoContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+videoContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+videoContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
+videoContainer.addEventListener('wheel', handleWheel, { passive: false });
 
 loadVideos();
