@@ -14,6 +14,7 @@ let allVideos = [];
 let currentIndex = 0;
 let isLoading = false;
 let isNavigating = false;
+let isPlaying = true;
 
 const videoContainer = document.getElementById('video-container');
 const videoWrapper = document.getElementById('video-wrapper');
@@ -216,6 +217,7 @@ function playVideo(index) {
     
     updateUI(allVideos[index]);
     currentIndex = index;
+    isPlaying = true;
     isNavigating = false;
 }
 
@@ -287,12 +289,12 @@ function handleTouchMove(e) {
     curSlide.style.transition = 'none';
     curSlide.style.transform = `translateY(${diff}px)`;
     
-    if (diff < 0 && currentIndex < allVideos.length - 1) {
-        const nextSlide = slideAt(currentIndex + 1);
-        if (nextSlide) { nextSlide.style.transition = 'none'; nextSlide.style.transform = `translateY(calc(100% + ${diff}px))`; }
-    } else if (diff > 0 && currentIndex > 0) {
+    if (diff < 0 && currentIndex > 0) {
         const prevSlide = slideAt(currentIndex - 1);
-        if (prevSlide) { prevSlide.style.transition = 'none'; prevSlide.style.transform = `translateY(calc(-100% + ${diff}px))`; }
+        if (prevSlide) { prevSlide.style.transition = 'none'; prevSlide.style.transform = `translateY(calc(-100% + ${Math.abs(diff)}px))`; }
+    } else if (diff > 0 && currentIndex < allVideos.length - 1) {
+        const nextSlide = slideAt(currentIndex + 1);
+        if (nextSlide) { nextSlide.style.transition = 'none'; nextSlide.style.transform = `translateY(calc(100% - ${diff}px))`; }
     }
 }
 
@@ -313,10 +315,10 @@ function handleTouchEnd() {
         }
     };
     
-    if (isSwipe && diff < -30 && currentIndex < allVideos.length - 1) {
-        navigateTo(currentIndex + 1, 'up');
-    } else if (isSwipe && diff > 30 && currentIndex > 0) {
+    if (isSwipe && diff < -30 && currentIndex > 0) {
         navigateTo(currentIndex - 1, 'down');
+    } else if (isSwipe && diff > 30 && currentIndex < allVideos.length - 1) {
+        navigateTo(currentIndex + 1, 'up');
     } else {
         const curSlide = slideAt(currentIndex);
         if (curSlide) {
@@ -405,15 +407,16 @@ videoContainer.addEventListener('click', (e) => {
     const iframe = currentSlide.querySelector('iframe');
     if (!iframe || !iframe.contentWindow) return;
     
-    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+    const command = isPlaying ? 'pauseVideo' : 'playVideo';
+    iframe.contentWindow.postMessage(`{"event":"command","func":"${command}","args":""}`, '*');
+    isPlaying = !isPlaying;
     
-    const playIcon = document.createElement('div');
-    playIcon.className = 'play-icon';
-    playIcon.innerHTML = '<i class="fa-solid fa-play"></i>';
-    playIcon.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:60px;color:white;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;';
-    document.body.appendChild(playIcon);
-    setTimeout(() => playIcon.style.opacity = '1', 10);
-    setTimeout(() => { playIcon.style.opacity = '0'; setTimeout(() => playIcon.remove(), 300); }, 500);
+    const icon = document.createElement('div');
+    icon.innerHTML = isPlaying ? '<i class="fa-solid fa-play"></i>' : '<i class="fa-solid fa-pause"></i>';
+    icon.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-size:60px;color:white;opacity:0;transition:opacity 0.3s;z-index:100;pointer-events:none;';
+    document.body.appendChild(icon);
+    setTimeout(() => icon.style.opacity = '1', 10);
+    setTimeout(() => { icon.style.opacity = '0'; setTimeout(() => icon.remove(), 300); }, 500);
 });
 
 loadVideos();
