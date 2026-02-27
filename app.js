@@ -201,29 +201,28 @@ function slideAt(index) {
     return videoWrapper.querySelector(`.video-slide[data-index="${index}"]`);
 }
 
-async function loadMoreVideos() {
-    if (isLoadingMore) return;
-    isLoadingMore = true;
+let preloadTimeout = null;
+
+function preloadVideosInBackground() {
+    if (preloadTimeout) clearTimeout(preloadTimeout);
     
-    setTimeout(() => {
-        if (!isLoadingMore) return;
-        loadingEl.querySelector('.loading-text').textContent = 'Loading more...';
-        loadingEl.classList.remove('hidden');
-    }, 500);
-    
-    const moreVideos = await fetchMoreVideosFromAPI();
-    
-    moreVideos.forEach((video) => {
-        const slide = createVideoSlide(video, allVideos.length);
-        videoWrapper.appendChild(slide);
-        allVideos.push(video);
-    });
-    
-    setCachedVideos(allVideos);
-    
-    loadingEl.classList.add('hidden');
-    loadingEl.querySelector('.loading-text').textContent = 'Loading...';
-    isLoadingMore = false;
+    preloadTimeout = setTimeout(async () => {
+        if (isLoadingMore || allVideos.length - currentIndex < 20) return;
+        
+        isLoadingMore = true;
+        const moreVideos = await fetchMoreVideosFromAPI();
+        
+        moreVideos.forEach((video) => {
+            const slide = createVideoSlide(video, allVideos.length);
+            videoWrapper.appendChild(slide);
+            allVideos.push(video);
+        });
+        
+        setCachedVideos(allVideos);
+        isLoadingMore = false;
+        
+        preloadVideosInBackground();
+    }, 5000);
 }
 
 async function fetchMoreVideosFromAPI() {
@@ -264,8 +263,8 @@ async function fetchMoreVideosFromAPI() {
 function playVideo(index) {
     if (index < 0) return;
     
-    if (index >= allVideos.length - 5 && !isLoadingMore) {
-        loadMoreVideos();
+    if (index >= allVideos.length - 10 && !isLoadingMore) {
+        preloadVideosInBackground();
     }
     
     if (isNavigating || index >= allVideos.length) return;
@@ -295,6 +294,8 @@ function playVideo(index) {
     currentIndex = index;
     isPlaying = true;
     isNavigating = false;
+    
+    preloadVideosInBackground();
 }
 
 function navigateTo(index, direction) {
