@@ -1,4 +1,12 @@
-const YOUTUBE_API_KEY = 'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8';
+const YOUTUBE_API_KEYS = [
+    'AIzaSyBw2r9SblJfPB80rsFpe34h3g7sFuz4_YI',
+    'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8',
+    'AIzaSyCzqWoDzcAO7eezfXPfguCwghlDh_ifZs8'
+];
+
+function getApiKey() {
+    return YOUTUBE_API_KEYS[Math.floor(Math.random() * YOUTUBE_API_KEYS.length)];
+}
 
 const CACHE_KEY = 'vinyl_tiktok_all_videos';
 const CACHE_DURATION = 1000 * 60 * 60 * 24 * 30;
@@ -41,7 +49,7 @@ function shuffleArray(arr) {
 }
 
 async function fetchChannelVideos(channelId, order) {
-    const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=${order}&maxResults=50&type=video`;
+    const url = `https://www.googleapis.com/youtube/v3/search?key=${getApiKey()}&channelId=${channelId}&part=snippet,id&order=${order}&maxResults=50&type=video`;
     try {
         const data = await fetch(url).then(r => r.json());
         return (data.items || []).filter(i => i.id.videoId).map(i => ({
@@ -58,18 +66,7 @@ async function fetchChannelVideos(channelId, order) {
 }
 
 function getCachedVideos() {
-    try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        const seenData = localStorage.getItem(SEEN_VIDEOS_KEY);
-        
-        if (cached) {
-            const data = JSON.parse(cached);
-            console.log('Using cached videos:', data.length);
-            return data;
-        }
-    } catch (e) {
-        console.log('Cache read error:', e);
-    }
+    // Always fetch fresh - no cache
     return null;
 }
 
@@ -95,14 +92,22 @@ async function fetchAllVideos() {
     
     const seen = new Set();
     const result = [];
-    const pageTokens = ['', 'CAoQAA', 'CBkQAA'];
-    const dateFilters = ['', '&publishedBefore=2024-01-01T00:00:00Z', '&publishedBefore=2023-01-01T00:00:00Z'];
+    const pageTokens = ['', 'CAoQAA', 'CBkQAA', 'CCoQAA'];
+    const dateFilters = ['', '&publishedBefore=2025-01-01T00:00:00Z', '&publishedBefore=2024-01-01T00:00:00Z', '&publishedBefore=2023-01-01T00:00:00Z', '&publishedBefore=2022-01-01T00:00:00Z'];
     
-    for (const channelId of Object.values(CHANNEL_IDS)) {
-        for (const dateFilter of dateFilters) {
-            for (const pageToken of pageTokens) {
-                const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=20&type=video${dateFilter}${pageToken ? '&pageToken=' + pageToken : ''}`;
-                try {
+    const channels = Object.values(CHANNEL_IDS);
+    
+    for (let i = 0; i < 5; i++) {
+        // Shuffle channels for each iteration
+        channels.sort(() => Math.random() - 0.5);
+        
+        for (const channelId of channels) {
+            for (const dateFilter of dateFilters) {
+                if (result.length >= 200) break;
+                for (const pageToken of pageTokens) {
+                    if (result.length >= 200) break;
+                    const url = `https://www.googleapis.com/youtube/v3/search?key=${getApiKey()}&channelId=${channelId}&part=snippet,id&order=date&maxResults=20&type=video${dateFilter}${pageToken ? '&pageToken=' + pageToken : ''}`;
+                    try {
                     const response = await fetch(url);
                     const data = await response.json();
                     
@@ -232,7 +237,7 @@ async function fetchMoreVideosFromAPI() {
     const randomChannel = Object.values(CHANNEL_IDS)[Math.floor(Math.random() * Object.values(CHANNEL_IDS).length)];
     
     for (const pageToken of pageTokens) {
-        const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${randomChannel}&part=snippet,id&order=date&maxResults=15&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
+        const url = `https://www.googleapis.com/youtube/v3/search?key=${getApiKey()}&channelId=${randomChannel}&part=snippet,id&order=date&maxResults=15&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
         try {
             const response = await fetch(url);
             const data = await response.json();
