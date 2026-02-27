@@ -1,4 +1,7 @@
-const YOUTUBE_API_KEY = 'AIzaSyCzqWoDzcAO7eezfXPfguCwghlDh_ifZs8';
+const YOUTUBE_API_KEY = 'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8';
+
+const CACHE_KEY = 'vinyl_tiktok_videos';
+const CACHE_DURATION = 1000 * 60 * 60 * 3;
 
 const CHANNEL_IDS = {
     'VinylArcheologie':              'UCKydEBEvAU5zkN8o1snt62A',
@@ -50,21 +53,50 @@ async function fetchChannelVideos(channelId, order) {
     }
 }
 
+function getCachedVideos() {
+    try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            const data = JSON.parse(cached);
+            if (Date.now() - data.timestamp < CACHE_DURATION) {
+                console.log('Using cached videos:', data.videos.length);
+                return data.videos;
+            }
+        }
+    } catch (e) {
+        console.log('Cache read error:', e);
+    }
+    return null;
+}
+
+function setCachedVideos(videos) {
+    try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+            timestamp: Date.now(),
+            videos: videos
+        }));
+    } catch (e) {
+        console.log('Cache write error:', e);
+    }
+}
+
 async function fetchAllVideos() {
+    const cached = getCachedVideos();
+    if (cached) return cached;
+    
     const seen = new Set();
     const result = [];
-    const pageTokens = ['', 'CAoQAA', 'CBkQAA'];
+    const pageTokens = ['', 'CAoQAA'];
     
     for (const channelId of Object.values(CHANNEL_IDS)) {
         for (const pageToken of pageTokens) {
-            const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
+            const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=25&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
             try {
                 const response = await fetch(url);
                 const data = await response.json();
                 
                 if (data.error) {
                     console.error('YouTube API error:', data.error);
-                    loadingEl.querySelector('.loading-text').textContent = 'API Error - Please refresh';
                     continue;
                 }
                 
@@ -86,13 +118,17 @@ async function fetchAllVideos() {
             } catch (e) {
                 console.error('Fetch error:', e);
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 200));
         }
     }
     
     for (let i = result.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [result[i], result[j]] = [result[j], result[i]];
+    }
+    
+    if (result.length > 0) {
+        setCachedVideos(result);
     }
     
     return result;
