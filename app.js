@@ -1,7 +1,7 @@
 const YOUTUBE_API_KEY = 'AIzaSyBiNS-Xtp-Ck-z39OAxVCGtqZNx6h-pVW8';
 
-const CACHE_KEY = 'vinyl_tiktok_videos';
-const CACHE_DURATION = 1000 * 60 * 60 * 3;
+const CACHE_KEY = 'vinyl_tiktok_videos_v2';
+const CACHE_DURATION = 1000 * 60 * 60 * 24;
 
 const CHANNEL_IDS = {
     'VinylArcheologie':              'UCKydEBEvAU5zkN8o1snt62A',
@@ -86,39 +86,42 @@ async function fetchAllVideos() {
     
     const seen = new Set();
     const result = [];
-    const pageTokens = ['', 'CAoQAA'];
+    const pageTokens = ['', 'CAoQAA', 'CBkQAA'];
+    const dateFilters = ['', '&publishedBefore=2024-01-01T00:00:00Z', '&publishedBefore=2023-01-01T00:00:00Z'];
     
     for (const channelId of Object.values(CHANNEL_IDS)) {
-        for (const pageToken of pageTokens) {
-            const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=25&type=video${pageToken ? '&pageToken=' + pageToken : ''}`;
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                
-                if (data.error) {
-                    console.error('YouTube API error:', data.error);
-                    continue;
-                }
-                
-                if (!data.items || data.items.length === 0) break;
-                for (const item of data.items) {
-                    if (!item.id.videoId) continue;
-                    if (!seen.has(item.id.videoId)) {
-                        seen.add(item.id.videoId);
-                        result.push({
-                            id: item.id.videoId,
-                            title: item.snippet.title,
-                            channel: item.snippet.channelTitle,
-                            thumbnail: `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
-                            published: item.snippet.publishedAt
-                        });
+        for (const dateFilter of dateFilters) {
+            for (const pageToken of pageTokens) {
+                const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=20&type=video${dateFilter}${pageToken ? '&pageToken=' + pageToken : ''}`;
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        console.error('YouTube API error:', data.error);
+                        continue;
                     }
+                    
+                    if (!data.items || data.items.length === 0) break;
+                    for (const item of data.items) {
+                        if (!item.id.videoId) continue;
+                        if (!seen.has(item.id.videoId)) {
+                            seen.add(item.id.videoId);
+                            result.push({
+                                id: item.id.videoId,
+                                title: item.snippet.title,
+                                channel: item.snippet.channelTitle,
+                                thumbnail: `https://i.ytimg.com/vi/${item.id.videoId}/hqdefault.jpg`,
+                                published: item.snippet.publishedAt
+                            });
+                        }
+                    }
+                    if (!data.nextPageToken) break;
+                } catch (e) {
+                    console.error('Fetch error:', e);
                 }
-                if (!data.nextPageToken) break;
-            } catch (e) {
-                console.error('Fetch error:', e);
+                await new Promise(r => setTimeout(r, 300));
             }
-            await new Promise(r => setTimeout(r, 200));
         }
     }
     
@@ -152,8 +155,8 @@ function createVideoSlide(video, index) {
     
     slide.innerHTML = `
         <div class="thumbnail-bg" style="background-image:url(${video.thumbnail})"></div>
-        <iframe id="player-${index}" 
-            src="https://www.youtube.com/embed/${video.id}?enablejsapi=1&iv_load_policy=3&playsinline=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0"
+        <iframe 
+            data-src="https://www.youtube.com/embed/${video.id}?enablejsapi=1&iv_load_policy=3&playsinline=1&mute=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&autoplay=1"
             frameborder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
@@ -190,23 +193,13 @@ function playVideo(index) {
         
         if (i === index) {
             slide.style.display = 'flex';
-            
-            let src = iframe.src;
-            if (!src.includes('autoplay=1')) {
-                src = src.replace('youtube.com/embed/', 'youtube.com/embed?autoplay=1&');
-            }
-            src = src.replace('mute=0', 'mute=1');
+            const src = iframe.dataset.src;
             iframe.src = src;
             iframe.style.display = 'block';
-            
-            setTimeout(() => {
-                iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-            }, 100);
-            
             thumb.classList.add('hidden');
         } else {
             iframe.style.display = 'none';
-            iframe.src = iframe.src.replace('autoplay=1', 'autoplay=0').replace('mute=0', 'mute=1');
+            iframe.src = '';
             thumb.classList.remove('hidden');
             slide.style.display = 'none';
         }
@@ -246,16 +239,11 @@ function navigateTo(index, direction) {
             curSlide.style.transition = 'none';
             
             const iframe = curSlide.querySelector('iframe');
-            iframe.src = iframe.src.replace('autoplay=1', 'autoplay=0').replace('mute=0', 'mute=1');
+            iframe.src = '';
             
             const nextIframe = nextSlide.querySelector('iframe');
             nextIframe.style.display = 'block';
-            let src = nextIframe.src;
-            src = src.replace('mute=1', 'mute=1');
-            if (!src.includes('autoplay=1')) {
-                src = src.replace('youtube.com/embed/', 'youtube.com/embed?autoplay=1&');
-            }
-            nextIframe.src = src;
+            nextIframe.src = nextIframe.dataset.src;
             
             nextSlide.querySelector('.thumbnail-bg').classList.add('hidden');
             
