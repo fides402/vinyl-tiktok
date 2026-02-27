@@ -66,7 +66,7 @@ async function fetchChannelVideos(channelId, order) {
             id:        i.id.videoId,
             title:     i.snippet.title,
             channel:   i.snippet.channelTitle,
-            thumbnail: i.snippet.thumbnails?.medium?.url || i.snippet.thumbnails?.default?.url,
+            thumbnail: `https://i.ytimg.com/vi/${i.id.videoId}/maxresdefault.jpg`,
             published: i.snippet.publishedAt
         }));
     } catch (e) {
