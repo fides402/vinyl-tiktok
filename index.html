@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
     <title>Vinyl TikTok</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,21 +20,30 @@
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
+            <div class="loading-text">Loading videos...</div>
         </div>
         
-        <div class="hint" id="hint">↑ Swipe up for next</div>
+        <div class="hint" id="hint">↑ Swipe up</div>
         
-        <div class="overlay">
-            <div class="disc-info">
-                <a href="#" target="_blank" class="discogs-link" id="discogs-link">
-                    <span class="vinyl-icon">💿</span>
-                    <span class="discogs-text">Discogs</span>
-                </a>
-                <a href="#" target="_blank" class="youtube-link" id="youtube-link">
-                    <span class="yt-icon">▶</span>
-                    <span>YouTube</span>
-                </a>
+        <div class="sidebar">
+            <div class="sidebar-item" id="sidebar-discogs">
+                <div class="sidebar-icon">💿</div>
+                <div class="sidebar-text">Discogs</div>
             </div>
+            <div class="sidebar-item" id="sidebar-youtube">
+                <div class="sidebar-icon">▶️</div>
+                <div class="sidebar-text">YouTube</div>
+            </div>
+            <div class="sidebar-item" id="sidebar-share">
+                <div class="sidebar-icon">↗️</div>
+                <div class="sidebar-text">Share</div>
+            </div>
+        </div>
+        
+        <div class="bottom-bar">
+            <div class="channel-name" id="channel-name"></div>
+            <div class="track-name" id="track-name"></div>
+            <div class="track-details" id="track-details"></div>
         </div>
     </div>
     

@@ -11,27 +11,41 @@ const CHANNEL_IDS = {
 let allVideos = [];
 let currentIndex = 0;
 let isLoading = false;
-let isInitialized = false;
+let isPlaying = false;
 
 const videoContainer = document.getElementById('video-container');
 const videoWrapper = document.getElementById('video-wrapper');
 const loadingEl = document.getElementById('loading');
-const discogsLink = document.getElementById('discogs-link');
-const youtubeLink = document.getElementById('youtube-link');
-const hintEl = document.getElementById('hint');
+const channelNameEl = document.getElementById('channel-name');
+const trackNameEl = document.getElementById('track-name');
+const trackDetailsEl = document.getElementById('track-details');
+const sidebarDiscogs = document.getElementById('sidebar-discogs');
+const sidebarYoutube = document.getElementById('sidebar-youtube');
+const sidebarShare = document.getElementById('sidebar-share');
+
+let startY = 0;
+let currentY = 0;
+let isSwiping = false;
+let swipeStartTime = 0;
 
 async function fetchChannelVideos(channelId) {
     const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${channelId}&part=snippet,id&order=date&maxResults=50&type=video`;
     
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    return data.items?.filter(item => item.id.videoId).map(item => ({
-        id: item.id.videoId,
-        title: item.snippet.title,
-        channel: item.snippet.channelTitle,
-        published: item.snippet.publishedAt
-    })) || [];
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        return data.items?.filter(item => item.id.videoId).map(item => ({
+            id: item.id.videoId,
+            title: item.snippet.title,
+            channel: item.snippet.channelTitle,
+            thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url,
+            published: item.snippet.publishedAt
+        })) || [];
+    } catch (e) {
+        console.error('Error fetching videos:', e);
+        return [];
+    }
 }
 
 async function searchDiscogs(trackTitle, artist) {
@@ -43,10 +57,7 @@ async function searchDiscogs(trackTitle, artist) {
         const data = await response.json();
         
         if (data.results && data.results.length > 0) {
-            return {
-                url: data.results[0].uri,
-                title: data.results[0].title
-            };
+            return data.results[0].uri;
         }
     } catch (e) {
         console.log('Discogs search failed:', e);
@@ -63,102 +74,163 @@ function shuffleArray(array) {
     return shuffled;
 }
 
-function createVideoElement(video, index) {
+function createVideoSlide(video, index) {
     const slide = document.createElement('div');
     slide.className = 'video-slide';
     slide.dataset.index = index;
     slide.dataset.videoId = video.id;
+    slide.dataset.title = video.title;
+    slide.dataset.channel = video.channel;
     
-    const iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube.com/embed/${video.id}?autoplay=0&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1&enablejsapi=1`;
-    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-    iframe.allowFullscreen = true;
-    iframe.style.cssText = 'width:100%;height:100%;border:none;';
+    slide.innerHTML = `
+        <div class="thumbnail-bg" style="background-image: url(${video.thumbnail})"></div>
+        <div class="play-overlay" data-video-id="${video.id}"></div>
+        <iframe 
+            src="https://www.youtube.com/embed/${video.id}?autoplay=0&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+            style="display: none;">
+        </iframe>
+    `;
     
-    slide.appendChild(iframe);
+    return slide;
+}
+
+function updateUI(video, index) {
+    channelNameEl.textContent = video.channel;
+    trackNameEl.textContent = video.title;
     
-    const tag = document.createElement('div');
-    tag.className = 'channel-tag';
-    tag.textContent = video.channel;
-    slide.appendChild(tag);
+    const date = new Date(video.published);
+    trackDetailsEl.textContent = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     
-    const title = document.createElement('div');
-    title.className = 'track-title';
-    title.textContent = video.title;
-    slide.appendChild(title);
+    sidebarYoutube.onclick = () => {
+        window.open(`https://youtube.com/watch?v=${video.id}`, '_blank');
+    };
     
-    const number = document.createElement('div');
-    number.className = 'video-number';
-    number.textContent = `${index + 1} / ${allVideos.length}`;
-    slide.appendChild(number);
-    
-    const overlay = document.createElement('div');
-    overlay.className = 'overlay';
-    
-    const discInfo = document.createElement('div');
-    discInfo.className = 'disc-info';
-    
-    const discLink = discogsLink.cloneNode(true);
-    discLink.onclick = async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+    sidebarDiscogs.onclick = async () => {
         const parts = video.title.split('-');
         const artist = parts[0]?.trim() || video.channel;
         const track = parts.slice(1).join('-')?.trim() || video.title;
         
-        const discogsData = await searchDiscogs(track, artist);
-        if (discogsData) {
-            window.open(discogsData.url, '_blank');
+        const discogsUrl = await searchDiscogs(track, artist);
+        if (discogsUrl) {
+            window.open(discogsUrl, '_blank');
         } else {
             window.open(`https://www.discogs.com/search/?q=${encodeURIComponent(artist + ' ' + track)}`, '_blank');
         }
     };
     
-    const ytLink = youtubeLink.cloneNode(true);
-    ytLink.href = `https://youtube.com/watch?v=${video.id}`;
-    ytLink.target = '_blank';
-    
-    discInfo.appendChild(discLink);
-    discInfo.appendChild(ytLink);
-    overlay.appendChild(discInfo);
-    slide.appendChild(overlay);
-    
-    return slide;
+    sidebarShare.onclick = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: video.title,
+                text: `Check out: ${video.title}`,
+                url: `https://youtube.com/watch?v=${video.id}`
+            });
+        } else {
+            navigator.clipboard.writeText(`https://youtube.com/watch?v=${video.id}`);
+            alert('Link copied!');
+        }
+    };
 }
 
-function playVideoAtIndex(index) {
+function playVideo(index) {
     const slides = videoWrapper.querySelectorAll('.video-slide');
     
     slides.forEach((slide, i) => {
         const iframe = slide.querySelector('iframe');
-        const numberEl = slide.querySelector('.video-number');
+        const thumbBg = slide.querySelector('.thumbnail-bg');
+        const playOverlay = slide.querySelector('.play-overlay');
         
         if (i === index) {
-            const videoId = slide.dataset.videoId;
-            iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1&enablejsapi=1`;
-            slide.classList.add('active');
+            slide.style.display = 'flex';
+            slide.style.zIndex = '1';
             
-            if (numberEl) {
-                numberEl.textContent = `${index + 1} / ${allVideos.length}`;
+            iframe.style.display = 'block';
+            iframe.src = `https://www.youtube.com/embed/${slide.dataset.videoId}?autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1`;
+            
+            thumbBg.classList.add('hidden');
+            playOverlay.style.display = 'none';
+            
+            if (allVideos[index]) {
+                updateUI(allVideos[index], index);
             }
-            
-            updateLinks(allVideos[index]);
         } else {
-            const oldVideoId = slide.dataset.videoId;
-            iframe.src = `https://www.youtube.com/embed/${oldVideoId}?autoplay=0&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&playsinline=1`;
-            slide.classList.remove('active');
+            slide.style.display = 'none';
+            iframe.style.display = 'none';
+            iframe.src = '';
+            thumbBg.classList.remove('hidden');
+            playOverlay.style.display = 'flex';
         }
     });
     
     currentIndex = index;
 }
 
-function updateLinks(video) {
-    const parts = video.title.split('-');
-    const artist = parts[0]?.trim() || video.channel;
-    const track = parts.slice(1).join('-')?.trim() || video.title;
+function goToNext() {
+    if (currentIndex < allVideos.length - 1) {
+        playVideo(currentIndex + 1);
+    }
+}
+
+function goToPrev() {
+    if (currentIndex > 0) {
+        playVideo(currentIndex - 1);
+    }
+}
+
+function handleTouchStart(e) {
+    startY = e.touches[0].clientY;
+    isSwiping = true;
+    swipeStartTime = Date.now();
+}
+
+function handleTouchMove(e) {
+    if (!isSwiping) return;
     
-    youtubeLink.href = `https://youtube.com/watch?v=${video.id}`;
+    currentY = e.touches[0].clientY;
+    const diff = startY - currentY;
+    
+    const slides = videoWrapper.querySelectorAll('.video-slide');
+    slides.forEach(slide => {
+        if (parseInt(slide.dataset.index) === currentIndex) {
+            slide.style.transform = `translateY(${diff}px)`;
+            slide.style.transition = 'none';
+        }
+    });
+}
+
+function handleTouchEnd(e) {
+    if (!isSwiping) return;
+    
+    isSwiping = false;
+    const diff = startY - currentY;
+    const swipeTime = Date.now() - swipeStartTime;
+    const velocity = Math.abs(diff) / swipeTime;
+    
+    const slides = videoWrapper.querySelectorAll('.video-slide');
+    slides.forEach(slide => {
+        slide.style.transition = 'transform 0.3s ease';
+        slide.style.transform = 'translateY(0)';
+    });
+    
+    if (Math.abs(diff) > 100 || velocity > 0.3) {
+        if (diff > 0) {
+            goToNext();
+        } else {
+            goToPrev();
+        }
+    }
+}
+
+function handleWheel(e) {
+    e.preventDefault();
+    
+    if (e.deltaY > 50) {
+        goToNext();
+    } else if (e.deltaY < -50) {
+        goToPrev();
+    }
 }
 
 async function loadVideos() {
@@ -178,42 +250,35 @@ async function loadVideos() {
     videoWrapper.innerHTML = '';
     
     for (let i = 0; i < allVideos.length; i++) {
-        const slide = createVideoElement(allVideos[i], i);
+        const slide = createVideoSlide(allVideos[i], i);
         videoWrapper.appendChild(slide);
+        
+        slide.querySelector('.play-overlay').addEventListener('click', () => {
+            playVideo(i);
+        });
     }
     
     loadingEl.classList.add('hidden');
     
     if (allVideos.length > 0) {
-        setTimeout(() => {
-            playVideoAtIndex(0);
-            videoContainer.scrollTo({ top: 0, behavior: 'auto' });
-        }, 100);
+        playVideo(0);
     }
     
     isLoading = false;
-    setupScrollListener();
 }
 
-function setupScrollListener() {
-    if (isInitialized) return;
-    isInitialized = true;
-    
-    let scrollTimeout;
-    
-    videoContainer.addEventListener('scroll', () => {
-        if (scrollTimeout) clearTimeout(scrollTimeout);
-        
-        scrollTimeout = setTimeout(() => {
-            const scrollTop = videoContainer.scrollTop;
-            const containerHeight = videoContainer.clientHeight;
-            const newIndex = Math.round(scrollTop / containerHeight);
-            
-            if (newIndex >= 0 && newIndex < allVideos.length && newIndex !== currentIndex) {
-                playVideoAtIndex(newIndex);
-            }
-        }, 100);
-    }, { passive: true });
-}
+videoContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+videoContainer.addEventListener('touchmove', handleTouchMove, { passive: true });
+videoContainer.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+videoContainer.addEventListener('wheel', handleWheel, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'j') {
+        goToNext();
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        goToPrev();
+    }
+});
 
 loadVideos();

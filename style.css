@@ -2,6 +2,7 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
@@ -9,119 +10,128 @@ html, body {
     height: 100%;
     overflow: hidden;
     background: #000;
-    font-family: 'Outfit', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overscroll-behavior: none;
-    touch-action: pan-y;
+    -webkit-overflow-scrolling: none;
+    touch-action: none;
 }
 
 #app {
     width: 100%;
     height: 100%;
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
 }
 
 .video-container {
     width: 100%;
     height: 100%;
-    overflow-y: scroll;
-    overflow-x: hidden;
-    scroll-snap-type: y mandatory;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    touch-action: pan-y;
+    overflow: hidden;
+    position: relative;
+    background: #000;
 }
 
-.video-container::-webkit-scrollbar {
-    display: none;
+.video-wrapper {
+    width: 100%;
+    height: 100%;
+    position: relative;
 }
 
 .video-slide {
     width: 100%;
     height: 100%;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
     background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .video-slide iframe {
     width: 100%;
     height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     border: none;
-    pointer-events: none;
 }
 
-.overlay {
+.video-slide video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+}
+
+.thumbnail-bg {
+    width: 100%;
+    height: 100%;
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
-    right: 0;
-    padding: 20px;
-    padding-bottom: 40px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.9));
-    z-index: 10;
-    pointer-events: none;
+    background-size: cover;
+    background-position: center;
+    filter: blur(0px);
+    transition: opacity 0.3s;
 }
 
-.disc-info {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
+.thumbnail-bg.hidden {
+    opacity: 0;
 }
 
-.discogs-link, .youtube-link {
+.play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px;
+    height: 80px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 24px;
-    border-radius: 50px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 14px;
-    transition: transform 0.2s, opacity 0.2s;
-    pointer-events: auto;
+    justify-content: center;
     cursor: pointer;
+    z-index: 20;
+    transition: transform 0.2s;
 }
 
-.discogs-link {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #e94560;
-    color: #e94560;
-    font-family: 'Space Mono', monospace;
-    letter-spacing: 0.5px;
+.play-overlay:active {
+    transform: translate(-50%, -50%) scale(0.9);
 }
 
-.youtube-link {
-    background: #e94560;
+.play-overlay::after {
+    content: '▶';
+    font-size: 30px;
     color: white;
-    font-family: 'Space Mono', monospace;
-    letter-spacing: 0.5px;
-}
-
-.discogs-link:hover, .youtube-link:hover {
-    transform: scale(1.05);
-    opacity: 0.9;
-}
-
-.vinyl-icon, .yt-icon {
-    font-size: 16px;
+    margin-left: 5px;
 }
 
 .loading {
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 200;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading.hidden {
+    display: none;
 }
 
 .spinner {
     width: 50px;
     height: 50px;
     border: 3px solid rgba(255,255,255,0.1);
-    border-top-color: #e94560;
+    border-top-color: #fe2c55;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -130,22 +140,21 @@ html, body {
     to { transform: rotate(360deg); }
 }
 
-.loading.hidden {
-    display: none;
+.loading-text {
+    color: #fff;
+    margin-top: 20px;
+    font-size: 14px;
 }
 
 .hint {
     position: fixed;
-    top: 20px;
+    top: 60px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255,255,255,0.2);
-    padding: 8px 16px;
-    border-radius: 20px;
-    color: white;
-    font-size: 12px;
-    backdrop-filter: blur(10px);
-    z-index: 150;
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 100;
     animation: fadeHint 3s ease-in-out forwards;
     pointer-events: none;
 }
@@ -155,46 +164,107 @@ html, body {
     100% { opacity: 0; }
 }
 
-.channel-tag {
-    position: absolute;
-    top: 50px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255,255,255,0.15);
-    padding: 6px 14px;
-    border-radius: 15px;
-    color: rgba(255,255,255,0.9);
+.sidebar {
+    position: fixed;
+    right: 10px;
+    bottom: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+    z-index: 50;
+}
+
+.sidebar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.sidebar-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    transition: transform 0.2s;
+}
+
+.sidebar-item:active .sidebar-icon {
+    transform: scale(0.9);
+}
+
+.sidebar-text {
+    color: white;
     font-size: 11px;
     font-weight: 500;
-    z-index: 15;
-    backdrop-filter: blur(10px);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
-.track-title {
-    position: absolute;
-    bottom: 120px;
-    left: 50%;
-    transform: translateX(-50%);
+.bottom-bar {
+    position: fixed;
+    left: 10px;
+    bottom: 30px;
+    right: 80px;
+    z-index: 50;
+}
+
+.channel-name {
     color: white;
-    font-family: 'Outfit', sans-serif;
     font-size: 16px;
     font-weight: 700;
-    text-align: center;
-    max-width: 90%;
-    text-shadow: 0 2px 10px rgba(233, 69, 96, 0.5);
-    z-index: 15;
-    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
-.video-number {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(233, 69, 96, 0.8);
+.track-name {
     color: white;
-    padding: 8px 12px;
-    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 5px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.track-details {
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255,255,255,0.2);
+    z-index: 100;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #fe2c55;
+    width: 0%;
+    transition: width 0.1s;
+}
+
+.video-counter {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 15px;
     font-size: 12px;
     font-weight: 600;
-    z-index: 15;
+    z-index: 100;
 }
